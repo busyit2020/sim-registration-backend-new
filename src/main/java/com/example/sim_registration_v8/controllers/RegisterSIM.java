@@ -27,6 +27,20 @@ import java.util.*;
 @Controller
 public class RegisterSIM {
 
+    /*
+    * What really left to do is writing ann endpoint that receives Ghana card and surname from third party
+    *  guys then sends it to NCA to confirm Ghana card by parsing GH card and surname received from 3rd Party guys.
+    * When this is successful you send back the information the third party guys so they finally approve it.
+    *
+    * There is a PDF document "SIM Registration document for APIs created by Busy" you will find sequential
+    * approach how the three endpoint created so far works.
+    *
+    * Briefly, first authenticate endpoint is called which sends them tokens to be parsed in headers
+    * secondly they do whatever and send the user data to you via register-sim endpoint which stores it in Busy DB
+    *
+    *
+    * */
+
     @Autowired
     SIMService simService;
 

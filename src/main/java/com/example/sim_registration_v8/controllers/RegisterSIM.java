@@ -38,7 +38,9 @@ public class RegisterSIM {
     * Briefly, first authenticate endpoint is called which sends them tokens to be parsed in headers
     * secondly they do whatever and send the user data to you via register-sim endpoint which stores it in Busy DB
     *
+    * DB NAME is "busyapis" and tables used are "sim_registration" and "sim_registration_confirmation"
     *
+    * You can access Database when you are connected on their VPN and initiate connection using SQL Workbench or SQL ACE for Macbook
     * */
 
     @Autowired

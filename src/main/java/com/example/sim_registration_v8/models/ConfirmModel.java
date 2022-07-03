@@ -2,16 +2,20 @@ package com.example.sim_registration_v8.models;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.Table;
+
+import org.hibernate.annotations.GenericGenerator;
 
 @Entity
 @Table(name = "SIM_REGISTRATION_CONFIRMATION")
 public class ConfirmModel {
 
     @Id
-    @Column(name = "id", nullable = false)
-    private int id;
+    @GeneratedValue(generator = "system-uuid")
+  	@GenericGenerator(name = "system-uuid", strategy = "uuid")
+    private String id;
 
     @Column(name = "transaction_id")
     private String transaction_id;
@@ -31,11 +35,11 @@ public class ConfirmModel {
     @Column(name = "digital_address")
     private String digital_address;
 
-    public int getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(String id) {
         this.id = id;
     }
 

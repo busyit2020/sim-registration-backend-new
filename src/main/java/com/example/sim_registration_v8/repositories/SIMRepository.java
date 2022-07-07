@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface SIMRepository extends JpaRepository<SIMRegistrationModel, String> {
 
-    List<SIMRegistrationModel> findSIMRegistrationModelByMsisdn(String msisdn);
+    SIMRegistrationModel findSIMRegistrationModelByMsisdn(String msisdn);
 }

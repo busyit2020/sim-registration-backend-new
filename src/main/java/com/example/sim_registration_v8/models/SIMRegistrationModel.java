@@ -10,17 +10,19 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import javax.persistence.UniqueConstraint;
 
 import org.hibernate.annotations.GenericGenerator;
 
 @Entity
-@Table(name = "SIM_REGISTRATION")
+@Table(name = "SIM_REGISTRATION", uniqueConstraints = @UniqueConstraint(columnNames = "transaction_id"))
 public class SIMRegistrationModel {
-    @Id
-    @GeneratedValue(generator = "system-uuid")
-	@GenericGenerator(name = "system-uuid", strategy = "uuid")
-    private String id;
+//    @Id
+//    @GeneratedValue(generator = "system-uuid")
+//	@GenericGenerator(name = "system-uuid", strategy = "uuid")
+//    private String id;
 
+    @Id
     @Column(name = "transaction_id")
     private String transaction_id;
 
@@ -53,8 +55,19 @@ public class SIMRegistrationModel {
 
     @Column(name = "email")
     private String email;
+    
+    @Column(name = "reg_status")
+    private String reg_status;
 
-    @Column(name = "digital_address")
+    public String getReg_status() {
+		return reg_status;
+	}
+
+	public void setReg_status(String reg_status) {
+		this.reg_status = reg_status;
+	}
+
+	@Column(name = "digital_address")
     private String digital_address;
 
     public String getTransaction_id() {
@@ -164,11 +177,11 @@ public class SIMRegistrationModel {
     @Column(name = "entity")
     private String entity;
 
-    public String getId() {
-        return id;
-    }
+//    public String getId() {
+//        return id;
+//    }
 
-    public void setId(String id) {
-        this.id = id;
-    }
+//    public void setId(String id) {
+//        this.id = id;
+//    }
 }

@@ -2,7 +2,6 @@ package com.example.sim_registration_v8.controllers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
@@ -16,7 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.context.annotation.SessionScope;
+import org.springframework.web.context.annotation.RequestScope;
 
 import com.example.sim_registration_v8.config.GeneralPropertiesConfig;
 import com.example.sim_registration_v8.models.ConfirmModel;
@@ -24,9 +23,9 @@ import com.example.sim_registration_v8.models.SIMRegistrationModel;
 import com.example.sim_registration_v8.nia.APICallUtils;
 import com.example.sim_registration_v8.nia.AuthRequest;
 import com.example.sim_registration_v8.nia.AuthResponse;
+import com.example.sim_registration_v8.nia.ConfirmEntity;
 import com.example.sim_registration_v8.nia.DeviceInfo;
 import com.example.sim_registration_v8.nia.VerificationRequest;
-import com.example.sim_registration_v8.nia.VerificationRequestExt;
 import com.example.sim_registration_v8.nia.VerificationResponse;
 import com.example.sim_registration_v8.repositories.ConfirmationRepository;
 import com.example.sim_registration_v8.repositories.SIMRepository;
@@ -36,7 +35,7 @@ import com.example.sim_registration_v8.services.TokenService;
 import com.google.gson.Gson;
 
 @RestController
-@SessionScope
+@RequestScope
 public class RegisterSIM {
 
 	/*
@@ -120,9 +119,7 @@ public class RegisterSIM {
 		return responseBody != null ? ResponseEntity.ok("Successful") : ResponseEntity.status(200).body("Unsuccessful");
 	}
 
-	@PostMapping(path = "/v1/verify-ghcard", consumes = "application/json", produces = "application/json")
-	public ResponseEntity<?> verifyPIN(@RequestHeader HttpHeaders headers,
-			@RequestBody VerificationRequestExt verificationReq) {
+//	public Object verifyPIN(VerificationRequestExt verificationReq) {
 
 //		Map<String, Object> map = new HashMap<>();
 //
@@ -133,18 +130,111 @@ public class RegisterSIM {
 //			return new ResponseEntity<>(map, HttpStatus.UNAUTHORIZED);
 //		}
 
+//		VerificationRequest req = new VerificationRequest();
+//		req.setCenter(config.getCenter());
+//		req.setUserID(config.getUserId());
+//		req.setPinNumber(verificationReq.getPinNumber());
+//		req.setSurname(verificationReq.getSurname());
+//		String responseBody = apiUtils.sendVerificationRequest(req);
+//		if (responseBody != null && responseBody.contains("DATA_SENT_ALREADY"))
+//			return ResponseEntity.ok("{ \"data\": \"DATA_SENT_ALREADY\", \"success\": true, \"code\": \"05\" }");
+//		VerificationResponse vResp = new Gson().fromJson(responseBody, VerificationResponse.class);
+//		if (vResp != null) {
+//			if (vResp.getCode().equals("02") || vResp.getCode().equals("00") || vResp.getCode().equals("05"))
+//				return ResponseEntity.ok(vResp);
+//		}
+
+	// Process API login to refresh token.
+//		AuthRequest authReq = new AuthRequest();
+//		DeviceInfo deviceInfo = new DeviceInfo();
+//		deviceInfo.setDeviceId(config.getDeviceId());
+//		deviceInfo.setDeviceType(config.getDeviceType());
+//		deviceInfo.setNotificationToken(config.getNotificationToken());
+//		authReq.setPassword(config.getPassword());
+//		authReq.setUsername(config.getUsername());
+//		authReq.setDeviceInfo(deviceInfo);
+//		try {
+//			responseBody = apiUtils.login(authReq);
+//			if (responseBody == null)
+//				System.out.println("System couldn't login to NIA server...\n Attempting login again...");
+//			else {
+//				AuthResponse authResp = new Gson().fromJson(responseBody, AuthResponse.class);
+//				tokenService.updateToken(authResp.getData().getRefreshToken(), authResp.getData().getAccessToken());
+//			}
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+//
+//		return ResponseEntity.status(500).body("An error occured. Please try again later.");
+//	}
+
+	@PostMapping(path = "/v1/register-sim", consumes = "application/json", produces = "application/json")
+	public ResponseEntity<Object> registerSim(@RequestHeader HttpHeaders headers,
+			@RequestBody SIMRegistrationModel registrationModel) {
+
+		Map<String, Object> map = new HashMap<>();
+
+		// do some few authorization checks
+		String token = Objects.requireNonNull(headers.get("X-Header-Authorization")).get(0);
+
+		if (!getList().contains(token) || token == null) {
+			map.put("Error", "authentication required");
+			return new ResponseEntity<>(map, HttpStatus.UNAUTHORIZED);
+		}
+
+//		List<SIMRegistrationModel> getRegistered = simRepository
+//				.findSIMRegistrationModelByMsisdn(registrationModel.getMsisdn());
+		/*
+		 * Check transaction type. If new, check data with NIA and update status before
+		 * saving. If existing, but with data already checked, just return success. If
+		 * data verification from NIA is not done, check with NIA, update status and
+		 * return status. Return value can be either valid for NIA or not valid.
+		 */
+
+//		if (getRegistered.size() < 1) {
+		simService.saveSIM(registrationModel);
+
+		// Check card data with NIA
 		VerificationRequest req = new VerificationRequest();
 		req.setCenter(config.getCenter());
 		req.setUserID(config.getUserId());
-		req.setPinNumber(verificationReq.getPinNumber());
-		req.setSurname(verificationReq.getSurname());
+		req.setPinNumber(registrationModel.getGhana_card_number());
+		req.setSurname(registrationModel.getLast_name());
 		String responseBody = apiUtils.sendVerificationRequest(req);
-		if (responseBody != null && responseBody.contains("DATA_SENT_ALREADY"))
-			return ResponseEntity.ok("{ \"data\": \"DATA_SENT_ALREADY\", \"success\": true, \"code\": \"05\" }");
+		// already sent
+		if (responseBody != null && responseBody.contains("DATA_SENT_ALREADY")) {
+			registrationModel.setReg_status("00");
+			simService.saveSIM(registrationModel);
+			map.put("Transaction_id", registrationModel.getTransaction_id());
+			map.put("is_valid", true);
+			map.put("message", "Record already exixts");
+			map.put("SUUID", registrationModel.getTransaction_id());
+			return new ResponseEntity<>(map, HttpStatus.OK);
+		}
 		VerificationResponse vResp = new Gson().fromJson(responseBody, VerificationResponse.class);
 		if (vResp != null) {
-			if (vResp.getCode().equals("02") || vResp.getCode().equals("00") || vResp.getCode().equals("05"))
-				return ResponseEntity.ok(vResp);
+			// card verification successful
+			if (vResp.getCode().equals("00")) {
+				registrationModel.setReg_status("00");
+				simService.saveSIM(registrationModel);
+				map.put("Transaction_id", registrationModel.getTransaction_id());
+				map.put("is_valid", true);
+//				map.put("message", "Record was successfully created");
+				map.put("SUUID", registrationModel.getTransaction_id());
+				return new ResponseEntity<>(map, HttpStatus.OK);
+			}
+			if (vResp.getCode().equals("05")) {
+				registrationModel.setReg_status("01");
+				simService.saveSIM(registrationModel);
+				map.put("Transaction_id", registrationModel.getTransaction_id());
+				map.put("is_valid", false);
+				map.put("errorcode", null);
+				map.put("ResponseMessage", "Invalid Ghana card details");
+				map.put("SUUID", registrationModel.getTransaction_id());
+				return new ResponseEntity<>(map, HttpStatus.OK);
+			}
+		} else {
+			return ResponseEntity.internalServerError().body("An error occured, please retry.");
 		}
 
 		// Process API login to refresh token.
@@ -168,43 +258,12 @@ public class RegisterSIM {
 			e.printStackTrace();
 		}
 
-		return ResponseEntity.status(500).body("An error occured. Please try again later.");
-	}
-
-	@PostMapping(path = "/v1/register-sim", consumes = "application/json", produces = "application/json")
-	public ResponseEntity<Object> registerSim(@RequestHeader HttpHeaders headers,
-			@RequestBody SIMRegistrationModel registrationModel) {
-
-		Map<String, Object> map = new HashMap<>();
-
-		// do some few authorization checks
-		String token = Objects.requireNonNull(headers.get("X-Header-Authorization")).get(0);
-
-		if (!getList().contains(token) || token == null) {
-			map.put("Error", "authentication required");
-			return new ResponseEntity<>(map, HttpStatus.UNAUTHORIZED);
-		}
-
-		List<SIMRegistrationModel> getRegistered = simRepository
-				.findSIMRegistrationModelByMsisdn(registrationModel.getMsisdn());
-		if (getRegistered.size() < 1) {
-			simService.saveSIM(registrationModel);
-			map.put("Transaction_id", registrationModel.getTransaction_id());
-			map.put("is_valid", true);
-			map.put("message", "Record was successfully created");
-			return new ResponseEntity<>(map, HttpStatus.OK);
-		} else {
-			map.put("Transaction_id", registrationModel.getTransaction_id());
-			map.put("is_valid", false);
-			map.put("message", "Record already exists");
-			return new ResponseEntity<>(map, HttpStatus.NOT_FOUND);
-		}
+		return ResponseEntity.internalServerError().body("Request could not be processed, please retry.");
 
 	}
 
 	@PostMapping(path = "/v1/notification", consumes = "application/json", produces = "application/json")
-	public ResponseEntity<Object> registerSim(@RequestHeader HttpHeaders headers,
-			@RequestBody ConfirmModel confirmModel) {
+	public ResponseEntity<Object> registerSimNotif(@RequestHeader HttpHeaders headers, @RequestBody ConfirmEntity cE) {
 
 		Map<String, Object> map = new HashMap<>();
 
@@ -216,16 +275,38 @@ public class RegisterSIM {
 			return new ResponseEntity<>(map, HttpStatus.UNAUTHORIZED);
 		}
 
-//        List<ConfirmModel> getRegistered = confirmationRepository.findConfirmModelByTransaction_id(confirmModel.getTransaction_id());
-		confirmationService.saveSIMConfirm(confirmModel);
-		map.put("Transaction_id", confirmModel.getTransaction_id());
-		map.put("data_received", true);
-		map.put("simcard_number", confirmModel.getMsisdn());
-		map.put("responseCode", "200");
-		map.put("Status", "Data updated");
-		map.put("message", "Record was successfully created");
+		SIMRegistrationModel reg = simRepository.findSIMRegistrationModelByMsisdn(cE.getMsisdn());
 
-		return new ResponseEntity<>(map, HttpStatus.OK);
+		ConfirmModel confirmModel = new ConfirmModel();
+
+		if (reg != null && "00"==reg.getReg_status()) {
+			confirmModel.setBiometric_data(cE.getBiometric_data());
+			confirmModel.setDigital_address(cE.getDigital_address());
+			confirmModel.setGhana_card_number(cE.getGhana_card_number());
+			confirmModel.setLongitude(cE.getLocation().getLng());
+			confirmModel.setLatitude(cE.getLocation().getLat());
+			confirmModel.setTransaction_id(cE.getTransaction_id());
+			confirmModel.setMsisdn(cE.getMsisdn());
+			confirmModel.setSuuid(cE.getSuuid());
+			confirmModel.setConfirmed(true);
+
+//        List<ConfirmModel> getRegistered = confirmationRepository.findConfirmModelByTransaction_id(confirmModel.getTransaction_id());
+			confirmationService.saveSIMConfirm(confirmModel);
+			map.put("Transaction_id", confirmModel.getTransaction_id());
+			map.put("data_received", true);
+			map.put("simcard_number", confirmModel.getMsisdn());
+			map.put("responseCode", "200");
+			map.put("simcard_number", reg.getMsisdn());
+			map.put("Status", "Data updated");
+			map.put("message", "Record was successfully created");
+			return new ResponseEntity<>(map, HttpStatus.OK);
+		}else {
+			map.put("Transaction_id", confirmModel.getTransaction_id());
+			map.put("data_received", false);
+			map.put("responseCode", "200");
+			return new ResponseEntity<>(map, HttpStatus.OK);
+		}
+
 		/*
 		 * if (getRegistered.size() < 1){
 		 * confirmationService.saveSIMConfirm(confirmModel); map.put("Transaction_id",

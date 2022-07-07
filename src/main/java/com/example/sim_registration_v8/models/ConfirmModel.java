@@ -2,21 +2,20 @@ package com.example.sim_registration_v8.models;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.Table;
-
-import org.hibernate.annotations.GenericGenerator;
+import javax.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "SIM_REGISTRATION_CONFIRMATION")
+@Table(name = "SIM_REGISTRATION_CONFIRMATION", uniqueConstraints = @UniqueConstraint(columnNames = "transaction_id"))
 public class ConfirmModel {
 
-    @Id
-    @GeneratedValue(generator = "system-uuid")
-  	@GenericGenerator(name = "system-uuid", strategy = "uuid")
-    private String id;
+//    @Id
+//    @GeneratedValue(generator = "system-uuid")
+//  	@GenericGenerator(name = "system-uuid", strategy = "uuid")
+//    private String id;
 
+	@Id
     @Column(name = "transaction_id")
     private String transaction_id;
 
@@ -34,16 +33,49 @@ public class ConfirmModel {
 
     @Column(name = "digital_address")
     private String digital_address;
+    
+    @Column(name = "longitude")
+    private String longitude;
+    
+    public String getLongitude() {
+		return longitude;
+	}
 
-    public String getId() {
-        return id;
-    }
+	public void setLongitude(String longitude) {
+		this.longitude = longitude;
+	}
 
-    public void setId(String id) {
-        this.id = id;
-    }
+	@Column(name = "latitude")
+    private String latitude;
+	
+	@Column(name = "confirmed")
+    private boolean confirmed;
+	
+//    public String getId() {
+//        return id;
+//    }
 
-    public String getTransaction_id() {
+//    public void setId(String id) {
+//        this.id = id;
+//    }
+
+    public boolean isConfirmed() {
+		return confirmed;
+	}
+
+	public void setConfirmed(boolean confirmed) {
+		this.confirmed = confirmed;
+	}
+
+	public String getLatitude() {
+		return latitude;
+	}
+
+	public void setLatitude(String latitude) {
+		this.latitude = latitude;
+	}
+
+	public String getTransaction_id() {
         return transaction_id;
     }
 

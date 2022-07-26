@@ -50,7 +50,7 @@ public class APICallUtils {
 			httpPost.setEntity(entity);
 			httpPost.setHeader("Accept", "application/json");
 			httpPost.setHeader("Content-type", "application/json");
-			System.out.println("Logging into NIA....");
+//			System.out.println("Logging into NIA....");
 			CloseableHttpResponse response = client.execute(httpPost);
 			responseBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
 			client.close();

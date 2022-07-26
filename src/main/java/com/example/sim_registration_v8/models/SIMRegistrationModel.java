@@ -5,10 +5,14 @@
  */
 package com.example.sim_registration_v8.models;
 
+import java.time.LocalDateTime;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.PrePersist;
+import javax.persistence.PreUpdate;
 import javax.persistence.Table;
 import javax.persistence.UniqueConstraint;
 
@@ -58,15 +62,69 @@ public class SIMRegistrationModel {
     
     @Column(name = "reg_status")
     private String reg_status;
+    
+    @Column(name = "suuid")
+    private String suuid;
+    
+    @Column(name = "agent_msisdn")
+    private String agent_msisdn;
+    
+    @Column(name = "created")
+    private LocalDateTime created;
 
-    public String getReg_status() {
+    @Column(name = "updated")
+    private LocalDateTime updated;
+    
+    public String getAgent_msisdn() {
+		return agent_msisdn;
+	}
+
+	public void setAgent_msisdn(String agent_msisdn) {
+		this.agent_msisdn = agent_msisdn;
+	}
+
+	public LocalDateTime getCreated() {
+		return created;
+	}
+
+	public void setCreated(LocalDateTime created) {
+		this.created = created;
+	}
+
+	public LocalDateTime getUpdated() {
+		return updated;
+	}
+
+	public void setUpdated(LocalDateTime updated) {
+		this.updated = updated;
+	}
+
+	@PrePersist
+	public void onCreate() {
+		setCreated(LocalDateTime.now());
+	}
+
+	@PreUpdate
+	public void onUpdate() {
+		setUpdated(LocalDateTime.now());
+	}
+
+    public String getSuuid() {
+		return suuid;
+	}
+
+	public void setSuuid(String suuid) {
+		this.suuid = suuid;
+	}
+
+	public String getReg_status() {
 		return reg_status;
 	}
 
 	public void setReg_status(String reg_status) {
 		this.reg_status = reg_status;
 	}
-
+	
 	@Column(name = "digital_address")
     private String digital_address;
 

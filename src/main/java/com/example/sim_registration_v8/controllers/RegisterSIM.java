@@ -33,6 +33,7 @@ import com.example.sim_registration_v8.services.ConfirmationService;
 import com.example.sim_registration_v8.services.SIMService;
 import com.example.sim_registration_v8.services.TokenService;
 import com.google.gson.Gson;
+import java.util.UUID;
 
 @RestController
 @RequestScope
@@ -175,15 +176,17 @@ public class RegisterSIM {
 		Map<String, Object> map = new HashMap<>();
 
 		// do some few authorization checks
-		String token = Objects.requireNonNull(headers.get("X-Header-Authorization")).get(0);
-
+		String token = null;
+		try {
+			token = Objects.requireNonNull(headers.get("X-Header-Authorization")).get(0);
+		} catch (NullPointerException e) {
+			return new ResponseEntity<>(map, HttpStatus.UNAUTHORIZED);
+		}
 		if (!getList().contains(token) || token == null) {
 			map.put("Error", "authentication required");
 			return new ResponseEntity<>(map, HttpStatus.UNAUTHORIZED);
 		}
 
-//		List<SIMRegistrationModel> getRegistered = simRepository
-//				.findSIMRegistrationModelByMsisdn(registrationModel.getMsisdn());
 		/*
 		 * Check transaction type. If new, check data with NIA and update status before
 		 * saving. If existing, but with data already checked, just return success. If
@@ -191,53 +194,18 @@ public class RegisterSIM {
 		 * return status. Return value can be either valid for NIA or not valid.
 		 */
 
-//		if (getRegistered.size() < 1) {
-		simService.saveSIM(registrationModel);
+		String responseBody = null;
 
-		// Check card data with NIA
-		VerificationRequest req = new VerificationRequest();
-		req.setCenter(config.getCenter());
-		req.setUserID(config.getUserId());
-		req.setPinNumber(registrationModel.getGhana_card_number());
-		req.setSurname(registrationModel.getLast_name());
-		String responseBody = apiUtils.sendVerificationRequest(req);
-		// already sent
-		if (responseBody != null && responseBody.contains("DATA_SENT_ALREADY")) {
-			registrationModel.setReg_status("00");
-			simService.saveSIM(registrationModel);
+		SIMRegistrationModel reg = simRepository.findByMsisdn(registrationModel.getMsisdn());
+		if (null != reg && reg.getReg_status().equalsIgnoreCase("00")) {
 			map.put("Transaction_id", registrationModel.getTransaction_id());
 			map.put("is_valid", true);
-			map.put("message", "Record already exixts");
-			map.put("SUUID", registrationModel.getTransaction_id());
+			map.put("message", "Record already exists");
+			map.put("SUUID", null);
 			return new ResponseEntity<>(map, HttpStatus.OK);
 		}
-		VerificationResponse vResp = new Gson().fromJson(responseBody, VerificationResponse.class);
-		if (vResp != null) {
-			// card verification successful
-			if (vResp.getCode().equals("00")) {
-				registrationModel.setReg_status("00");
-				simService.saveSIM(registrationModel);
-				map.put("Transaction_id", registrationModel.getTransaction_id());
-				map.put("is_valid", true);
-//				map.put("message", "Record was successfully created");
-				map.put("SUUID", registrationModel.getTransaction_id());
-				return new ResponseEntity<>(map, HttpStatus.OK);
-			}
-			if (vResp.getCode().equals("05")) {
-				registrationModel.setReg_status("01");
-				simService.saveSIM(registrationModel);
-				map.put("Transaction_id", registrationModel.getTransaction_id());
-				map.put("is_valid", false);
-				map.put("errorcode", null);
-				map.put("ResponseMessage", "Invalid Ghana card details");
-				map.put("SUUID", registrationModel.getTransaction_id());
-				return new ResponseEntity<>(map, HttpStatus.OK);
-			}
-		} else {
-			return ResponseEntity.internalServerError().body("An error occured, please retry.");
-		}
 
-		// Process API login to refresh token.
+		// Login to NIA
 		AuthRequest authReq = new AuthRequest();
 		DeviceInfo deviceInfo = new DeviceInfo();
 		deviceInfo.setDeviceId(config.getDeviceId());
@@ -258,8 +226,79 @@ public class RegisterSIM {
 			e.printStackTrace();
 		}
 
-		return ResponseEntity.internalServerError().body("Request could not be processed, please retry.");
+		try {
+			simService.saveSIM(registrationModel);
 
+			// Check card data with NIA
+			responseBody = null;
+			VerificationRequest req = new VerificationRequest();
+			req.setCenter(config.getCenter());
+			req.setUserID(config.getUserId());
+			req.setPinNumber(registrationModel.getGhana_card_number());
+			req.setSurname(registrationModel.getLast_name());
+			responseBody = apiUtils.sendVerificationRequest(req);
+			// already sent
+
+			if (responseBody != null && responseBody.contains("DATA_SENT_ALREADY")) {
+				registrationModel.setReg_status("00");
+				String suuid = UUID.fromString(registrationModel.getTransaction_id()).toString();
+				registrationModel.setSuuid(suuid);
+				simService.saveSIM(registrationModel);
+				map.put("Transaction_id", registrationModel.getTransaction_id());
+				map.put("is_valid", true);
+				map.put("message", "Record was successfully created");
+				map.put("SUUID", suuid);
+				return new ResponseEntity<>(map, HttpStatus.OK);
+			}
+			VerificationResponse vResp = new Gson().fromJson(responseBody, VerificationResponse.class);
+			if (vResp != null) {
+				// card verification successful
+				if (vResp.getCode().equals("00")) {
+					registrationModel.setReg_status("00");
+					registrationModel.setSuuid(vResp.getData().getShortGuid());
+					simService.saveSIM(registrationModel);
+					map.put("Transaction_id", registrationModel.getTransaction_id());
+					map.put("is_valid", true);
+					map.put("message", "Record was successfully created");
+					map.put("SUUID", vResp.getData().getShortGuid());
+					return new ResponseEntity<>(map, HttpStatus.OK);
+				}
+				if (vResp.getCode().equals("05")) {
+					registrationModel.setReg_status("01");
+					registrationModel.setSuuid(vResp.getData().getShortGuid());
+					simService.saveSIM(registrationModel);
+					map.put("Transaction_id", registrationModel.getTransaction_id());
+					map.put("is_valid", false);
+					map.put("errorcode", null);
+					map.put("message", "Invalid Ghana card details");
+					map.put("SUUID", vResp.getData().getShortGuid());
+					return new ResponseEntity<>(map, HttpStatus.OK);
+				}
+			} else {
+				map.put("Transaction_id", registrationModel.getTransaction_id());
+				map.put("is_valid", false);
+				map.put("errorcode", "05");
+				map.put("message", "Error while processing request. Please check your input and retry.");
+				map.put("SUUID", null);
+				return ResponseEntity.ok().body(map);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+//		} else {
+//			map.put("Transaction_id", registrationModel.getTransaction_id());
+//			map.put("is_valid", true);
+//			map.put("errorcode", null);
+//			map.put("message", "Record already exists");
+//			map.put("SUUID", UUID.fromString(registrationModel.getTransaction_id()));
+//			return ResponseEntity.ok().body(map);
+//		}
+		map.put("Transaction_id", registrationModel.getTransaction_id());
+		map.put("is_valid", false);
+		map.put("errorcode", "06");
+		map.put("message", "Error while processing request. Please check your input and retry.");
+		map.put("SUUID", UUID.fromString(registrationModel.getTransaction_id()));
+		return ResponseEntity.ok().body(map);
 	}
 
 	@PostMapping(path = "/v1/notification", consumes = "application/json", produces = "application/json")
@@ -268,18 +307,23 @@ public class RegisterSIM {
 		Map<String, Object> map = new HashMap<>();
 
 		// do some few authorization checks
-		String token = Objects.requireNonNull(headers.get("X-Header-Authorization")).get(0);
+		String token = null;
+		try {
+			token = Objects.requireNonNull(headers.get("X-Header-Authorization")).get(0);
+		} catch (NullPointerException e) {
+			return new ResponseEntity<>(map, HttpStatus.UNAUTHORIZED);
+		}
 
 		if (!getList().contains(token) || token == null) {
 			map.put("Error", "authentication required");
 			return new ResponseEntity<>(map, HttpStatus.UNAUTHORIZED);
 		}
 
-		SIMRegistrationModel reg = simRepository.findSIMRegistrationModelByMsisdn(cE.getMsisdn());
-
+		SIMRegistrationModel reg = simRepository.findById(cE.getTransaction_id()).orElse(new SIMRegistrationModel());
+//		System.out.println(reg.getTransaction_id() + " : " + (reg != null && "00" == reg.getReg_status()));
 		ConfirmModel confirmModel = new ConfirmModel();
 
-		if (reg != null && "00"==reg.getReg_status()) {
+		if (reg != null && "00".equals(reg.getReg_status())) {
 			confirmModel.setBiometric_data(cE.getBiometric_data());
 			confirmModel.setDigital_address(cE.getDigital_address());
 			confirmModel.setGhana_card_number(cE.getGhana_card_number());
@@ -292,7 +336,7 @@ public class RegisterSIM {
 
 //        List<ConfirmModel> getRegistered = confirmationRepository.findConfirmModelByTransaction_id(confirmModel.getTransaction_id());
 			confirmationService.saveSIMConfirm(confirmModel);
-			map.put("Transaction_id", confirmModel.getTransaction_id());
+			map.put("transaction_id", confirmModel.getTransaction_id());
 			map.put("data_received", true);
 			map.put("simcard_number", confirmModel.getMsisdn());
 			map.put("responseCode", "200");
@@ -300,8 +344,8 @@ public class RegisterSIM {
 			map.put("Status", "Data updated");
 			map.put("message", "Record was successfully created");
 			return new ResponseEntity<>(map, HttpStatus.OK);
-		}else {
-			map.put("Transaction_id", confirmModel.getTransaction_id());
+		} else {
+			map.put("transaction_id", confirmModel.getTransaction_id());
 			map.put("data_received", false);
 			map.put("responseCode", "200");
 			return new ResponseEntity<>(map, HttpStatus.OK);

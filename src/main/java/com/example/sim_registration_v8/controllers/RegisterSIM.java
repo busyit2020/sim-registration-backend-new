@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -197,11 +198,11 @@ public class RegisterSIM {
 		String responseBody = null;
 
 		SIMRegistrationModel reg = simRepository.findByMsisdn(registrationModel.getMsisdn());
-		if (null != reg && reg.getReg_status().equalsIgnoreCase("00")) {
+		if (!ObjectUtils.isEmpty(reg) && !ObjectUtils.isEmpty(reg.getReg_status()) && reg.getReg_status().equalsIgnoreCase("00")) {
 			map.put("Transaction_id", registrationModel.getTransaction_id());
 			map.put("is_valid", true);
-			map.put("message", "Record already exists");
-			map.put("SUUID", null);
+			map.put("message", "SIM already registered");
+			map.put("SUUID", reg.getSuuid());
 			return new ResponseEntity<>(map, HttpStatus.OK);
 		}
 
@@ -216,6 +217,7 @@ public class RegisterSIM {
 		authReq.setDeviceInfo(deviceInfo);
 		try {
 			responseBody = apiUtils.login(authReq);
+//			System.out.println("Login:    " + responseBody);
 			if (responseBody == null)
 				System.out.println("System couldn't login to NIA server...\n Attempting login again...");
 			else {
@@ -241,13 +243,14 @@ public class RegisterSIM {
 
 			if (responseBody != null && responseBody.contains("DATA_SENT_ALREADY")) {
 				registrationModel.setReg_status("00");
-				String suuid = UUID.fromString(registrationModel.getTransaction_id()).toString();
-				registrationModel.setSuuid(suuid);
+				SIMRegistrationModel chkSUUID = simService.findSUUID(registrationModel.getGhana_card_number());
+				String SUUID =  ObjectUtils.isEmpty(chkSUUID) ? null : chkSUUID.getSuuid();
+				registrationModel.setSuuid(SUUID);
 				simService.saveSIM(registrationModel);
 				map.put("Transaction_id", registrationModel.getTransaction_id());
 				map.put("is_valid", true);
 				map.put("message", "Record was successfully created");
-				map.put("SUUID", suuid);
+				map.put("SUUID", SUUID);
 				return new ResponseEntity<>(map, HttpStatus.OK);
 			}
 			VerificationResponse vResp = new Gson().fromJson(responseBody, VerificationResponse.class);

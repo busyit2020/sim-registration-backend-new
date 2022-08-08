@@ -300,7 +300,7 @@ public class RegisterSIM {
 		map.put("is_valid", false);
 		map.put("errorcode", "06");
 		map.put("message", "Error while processing request. Please check your input and retry.");
-		map.put("SUUID", UUID.fromString(registrationModel.getTransaction_id()));
+		map.put("SUUID", null);
 		return ResponseEntity.ok().body(map);
 	}
 
